@@ -131,9 +131,11 @@
         const canvas = canvasElement.getContext('2d');
         const startButton = document.getElementById('startButton');
         const resultTextArea = document.getElementById('resultTextArea');
+        const audioElement = $("#audio")[0]; // jQuery オブジェクトからオーディオ要素を取得
+        audioElement.volume = 0.5; // 音量を 50% に設定 (0.0 から 1.0 の範囲)
         let stream = null; // カメラストリームを保持
         let audio = new Audio('beep.mp3'); // 音声ファイルのパスを指定
-        audio.volume = 1; // 音量を調整
+        audio.volume = 0.5; // 音量を調整
 
         startButton.addEventListener('click', () => {
             if (stream) { // カメラがすでに起動している場合
