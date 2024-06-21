@@ -200,6 +200,8 @@
                         if (stream) {
                             stream.getTracks().forEach(track => track.stop());
                             stream = null;
+                            setTimeout(() => {
+                            }, 1000);
                             // オーディオを無効にする
                             if (audio) {
                                 audio.pause();
