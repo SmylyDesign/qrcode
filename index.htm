@@ -200,11 +200,7 @@
                         if (stream) {
                             stream.getTracks().forEach(track => track.stop());
                             stream = null;
-                            // オーディオを無効にする
-                            if (audio) {
-                                audio.pause();
-                                audio.currentTime = 0;
-                            }
+
                             // ボタンのテキストを元に戻す
                             startButton.textContent = "カメラを起動";
                         }
