@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>QRコード生成・リーダー</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <style>
+        body {
+            background-color: #f4f4f9;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin: 20px auto;
+            width: 90%;
+            max-width: 600px;
+        }
+        .card {
+            margin-bottom: 20px;
+        }
+        #video {
+            display: none; /* 映像を非表示に設定 */
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+        #layer {
+            z-index:2;
+        }
+        #canvas {
+            display: none;
+            width: 100%;
+            height: 200px;
+        }
+        #startButton {
+            width: 100%;
+            font-size: 18px;
+        }
+        #generate {
+            width: 100%;
+            font-size: 18px;
+        }
+        #resultTextArea {
+            width: 100%;
+            height: 100px;
+            margin-top: 10px;
+            padding: 5px;
+            resize: none;
+        }
+        #qrCodeCanvas {
+            width: 200px;
+            height: 200px;
+            margin: 20px auto;
+        }
+        #inputTextArea {
+            width: 100%;
+            height: 100px;
+            margin-top: 10px;
+            padding: 5px;
+            resize: none;
+        }
+        #generateButton {
+            width: 100%;
+            font-size: 18px;
+        }
+        #qrcode {
+            width: 300px; /* QRコードのサイズ */
+            height: 300px;
+            margin: 20px auto; /* 中央寄せ */
+            transition: transform 0.3s ease; /* アニメーションを追加 */
+            padding: 20px; /* 余白を追加 */ /* 読みやすさを考慮して余白を増やしました */
+            background-color: #ffffff;
+            border: 1px solid #ccc; /* 枠線を追加 */
+        }
+        #qrcode.enlarged {
+            transform: scale(1.75) translate(0%, 0%); /* 拡大と中央寄せ */
+        }
+        #downloadButton {
+            margin-top: 10px;
+            display: none; /* 初期状態では非表示 */
+        }
+        .text-center {
+            font-weight: bold; /* 強調表示 */
+            color: #007bff; /* 青色に変更 */
+        }
+    </style>
+</head>
+<body>
+    <audio src="beep.mp3" id="audio"></audio>
+    <div class="container">
+       <h2 class="text-center">QRcode Maker/Reader</h2>
+
+        <div id="layer" class="card">
+            <div class="card-body">
+                <h2 class="card-title">QRcode Maker</h2>
+                <label for="text">テキストを入力してください:</label>
+                <input type="text" class="form-control" id="text" value="">
+                <button id="generate" class="btn btn-primary mt-3">QRコード生成</button>
+                <div id="qrcode" class="mt-4"></div>
+                <button id="downloadButton" class="btn btn-success mt-2">画像をダウンロード</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title">QRcode Reader</h2>
+                <label for="text">QRコードをカメラに向けて下さい</label>
+                <button id="startButton" class="btn btn-primary mt-3">カメラを起動</button>
+                <video id="video" width="320" height="240" autoplay></video>
+                <canvas id="canvas"></canvas>
+                <textarea id="resultTextArea" readonly></textarea>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+        // QRコードリーダー部分
+        const video = document.getElementById('video');
+        const canvasElement = document.getElementById('canvas');
+        const canvas = canvasElement.getContext('2d');
+        const startButton = document.getElementById('startButton');
+        const resultTextArea = document.getElementById('resultTextArea');
+        let stream = null; // カメラストリームを保持
+        let audio = new Audio('beep.mp3'); // 音声ファイルのパスを指定
+        audio.volume = 1; // 音量を調整
+
+        startButton.addEventListener('click', () => {
+            if (stream) { // カメラがすでに起動している場合
+                // カメラを停止
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+                // ボタンのテキストを元に戻す
+                startButton.textContent = "カメラを起動";
+                // オーディオを停止
+                if (audio) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }
+            } else { // カメラが起動していない場合
+                // カメラを起動
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                        .then(function(s) {
+                            stream = s; // カメラストリームを保持
+                            video.srcObject = stream;
+                            video.play();
+                            requestAnimationFrame(tick);
+                            // ボタンのテキストを変更
+                            startButton.textContent = "スキャン中・・";
+                        })
+                        .catch(function(error) {
+                            console.error("カメラのアクセスに失敗しました。", error);
+                            alert("カメラへのアクセスを許可してください。");
+                        });
+                } else {
+                    console.error("getUserMedia is not supported on this browser");
+                    alert("このブラウザではカメラを利用できません。");
+                }
+            }
+        });
+
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvasElement.height = video.videoHeight;
+                canvasElement.width = video.videoWidth;
+                canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+                // canvas.willReadFrequently = true; // この行を追加
+                var imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                var code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert",
+                });
+
+                // QRコードが検出された時の処理
+                if (code) {
+                    // 音声再生
+                    audio.play();
+
+                    setTimeout(() => {
+                        // URLデコード処理を追加
+                        let decodedData;
+                        try {
+                            decodedData = decodeURIComponent(code.data);
+                        } catch (error) {
+                            decodedData = code.data; // デコードに失敗したらそのまま表示
+                        }
+                        // デコードされた値をテキストエリアに表示
+                        resultTextArea.value = decodedData; 
+                        // カメラを閉じる
+                        if (stream) {
+                            stream.getTracks().forEach(track => track.stop());
+                            stream = null;
+                            // オーディオを無効にする
+                            if (audio) {
+                                audio.pause();
+                                audio.currentTime = 0;
+                            }
+                            // ボタンのテキストを元に戻す
+                            startButton.textContent = "カメラを起動";
+                        }
+                    }, 300);
+                }
+                requestAnimationFrame(tick);
+            } else {
+                requestAnimationFrame(tick);
+            }
+        }
+
+        // QRコード生成部分
+
+        $(document).ready(function() {
+         $("#generate").click(function() {
+           var text = $("#text").val();
+           if (text === "") {
+             alert("テキストを入力してください。");
+             return;
+           }
+           $("#audio")[0].play();
+        // テキストをURLエンコード
+           var encodedText = encodeURIComponent(text);
+        // QRコード要素をクリア
+           $("#qrcode").empty(); 
+        // 新しいQRコードを生成
+            new QRCode(document.getElementById("qrcode"), {
+                text: encodedText, // エンコードしたテキストを使用
+                width: 256,
+                height: 256,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H,
+            });
+            // ダウンロードボタンを表示
+            $("#downloadButton").show();
+        });
+
+      // QRコードをクリックしたときの処理
+      $("#qrcode").click(function() {
+        $(this).toggleClass("enlarged"); // 拡大/縮小を切り替える
+      });
+
+      // ダウンロードボタンのクリックイベント
+      $("#downloadButton").click(function() {
+        // QRコードの画像データを取得
+        html2canvas(document.getElementById("qrcode")).then(canvas => {
+          // canvasから画像データを取得
+          const imgData = canvas.toDataURL("image/png");
+          // ダウンロード用のリンクを作成
+          const downloadLink = document.createElement("a");
+          downloadLink.href = imgData;
+          downloadLink.download = "qrcode.png"; // ファイル名を設定
+          // リンクをクリックしてダウンロードを実行
+          downloadLink.click();
+        });
+      });
+      });
+
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"  
+    crossorigin="anonymous"></script> 
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+</body>
+</html>
